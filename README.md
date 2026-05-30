@@ -59,4 +59,4 @@ Open `http://localhost:8080` in your browser.
 ```
 
 ## Made by
-B.Tech ECE Student — Vel Tech University, Chennai
+B.Tech EEE Student — Lendi College 
