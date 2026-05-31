@@ -2,12 +2,11 @@ from flask import Flask, render_template, request
 from src.helper import download_hugging_face_embeddings
 from langchain_community.vectorstores import Pinecone as PineconeStore
 from langchain_openai import ChatOpenAI
-from langchain.chains import create_retrieval_chain
-from langchain.chains.combine_documents import create_stuff_documents_chain
 from langchain_core.prompts import ChatPromptTemplate
+from langchain_core.output_parsers import StrOutputParser
+from langchain_core.runnables import RunnablePassthrough
 from dotenv import load_dotenv
 from src.prompt import *
-import pinecone
 import os
 import time
 
@@ -42,8 +41,15 @@ prompt = ChatPromptTemplate.from_messages([
     ("human", "{input}"),
 ])
 
-question_answer_chain = create_stuff_documents_chain(chatModel, prompt)
-rag_chain = create_retrieval_chain(retriever, question_answer_chain)
+def format_docs(docs):
+    return "\n\n".join(doc.page_content for doc in docs)
+
+rag_chain = (
+    {"context": retriever | format_docs, "input": RunnablePassthrough()}
+    | prompt
+    | chatModel
+    | StrOutputParser()
+)
 
 
 @app.route("/")
@@ -58,9 +64,9 @@ def chat():
         print("User:", msg)
         for attempt in range(3):
             try:
-                response = rag_chain.invoke({"input": msg})
-                print("Bot:", response["answer"])
-                return str(response["answer"])
+                answer = rag_chain.invoke(msg)
+                print("Bot:", answer)
+                return str(answer)
             except Exception as e:
                 if "429" in str(e):
                     print(f"Rate limited, retrying in 10s... ({attempt+1}/3)")
