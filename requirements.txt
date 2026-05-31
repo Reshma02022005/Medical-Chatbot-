@@ -10,3 +10,4 @@ langchain-text-splitters==0.3.8
 fastembed==0.4.2
 pinecone==6.0.2
 gunicorn==21.2.0
+pinecone-plugin-inference==0.0.0
