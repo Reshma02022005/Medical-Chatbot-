@@ -1,35 +1,36 @@
-from flask import Flask, render_template, jsonify, request
+from flask import Flask, render_template, request
 from src.helper import download_hugging_face_embeddings
+from langchain_community.vectorstores import Pinecone as PineconeStore
 from langchain_openai import ChatOpenAI
 from langchain.chains import create_retrieval_chain
 from langchain.chains.combine_documents import create_stuff_documents_chain
-from langchain_pinecone import PineconeVectorStore
 from langchain_core.prompts import ChatPromptTemplate
 from dotenv import load_dotenv
 from src.prompt import *
+import pinecone
 import os
+import time
 
 app = Flask(__name__)
-
 load_dotenv()
 
 PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY')
 OPENROUTER_API_KEY = os.environ.get('OPENROUTER_API_KEY')
-
 os.environ["PINECONE_API_KEY"] = PINECONE_API_KEY
 
 embeddings = download_hugging_face_embeddings()
-
 index_name = "medical-chatbot"
 
-docsearch = PineconeVectorStore.from_existing_index(
+docsearch = PineconeStore.from_existing_index(
     index_name=index_name,
     embedding=embeddings
 )
 
-retriever = docsearch.as_retriever(search_type="similarity", search_kwargs={"k": 3})
+retriever = docsearch.as_retriever(
+    search_type="similarity",
+    search_kwargs={"k": 1}
+)
 
-# Using OpenRouter with free model
 chatModel = ChatOpenAI(
     model="openai/gpt-oss-20b:free",
     openai_api_key=OPENROUTER_API_KEY,
@@ -55,12 +56,22 @@ def chat():
     try:
         msg = request.form["msg"]
         print("User:", msg)
-        response = rag_chain.invoke({"input": msg})
-        print("Bot:", response["answer"])
-        return str(response["answer"])
+        for attempt in range(3):
+            try:
+                response = rag_chain.invoke({"input": msg})
+                print("Bot:", response["answer"])
+                return str(response["answer"])
+            except Exception as e:
+                if "429" in str(e):
+                    print(f"Rate limited, retrying in 10s... ({attempt+1}/3)")
+                    time.sleep(10)
+                else:
+                    raise e
+        return "I'm busy right now, please ask again!"
     except Exception as e:
         print("ERROR:", str(e))
         return str(e)
 
+
 if __name__ == '__main__':
-    app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 10000)))
+    app.run(host="0.0.0.0", port=8080, debug=True)
