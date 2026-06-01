@@ -10,7 +10,7 @@ from src.prompt import *
 import os
 import time
 
-app = Flask(__name__)
+app = Flask(__name__, template_folder='templetes')
 load_dotenv()
 
 PINECONE_API_KEY = os.environ.get('PINECONE_API_KEY')
