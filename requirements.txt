@@ -8,3 +8,4 @@ langchain-text-splitters
 fastembed
 pinecone-client
 gunicorn
+langchain-pinecone
